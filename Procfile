@@ -1,1 +1,1 @@
-web: uvicorn src.main:app --host 0.0.0.0 --port $PORT --workers 2
+web: sh -c 'uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8001} --workers 2'
