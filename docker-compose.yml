@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  # Sankore Intelligence API
+  sankore:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: sankore-api
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://sankore:sankore_password@postgres:5432/sankore_db
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - META_API_KEY=${META_API_KEY:-}
+      - TIKTOK_ACCESS_TOKEN=${TIKTOK_ACCESS_TOKEN:-}
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=False
+      - ENVIRONMENT=production
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sankore-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: sankore-postgres
+    environment:
+      - POSTGRES_USER=sankore
+      - POSTGRES_PASSWORD=sankore_password
+      - POSTGRES_DB=sankore_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - sankore-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sankore"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache (Optional)
+  redis:
+    image: redis:7-alpine
+    container_name: sankore-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - sankore-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  sankore-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
