@@ -13,6 +13,10 @@ DATABASE_URL = os.getenv(
     "sqlite+aiosqlite:///./test.db"
 )
 
+# Convert postgresql:// to postgresql+asyncpg:// for async support
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+
 # Engine configuration with production-ready settings
 engine_kwargs = {
     "echo": os.getenv("DEBUG", "False").lower() == "true",
