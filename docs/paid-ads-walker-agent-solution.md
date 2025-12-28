@@ -97,7 +97,7 @@ An autonomous AI agent that:
             ▼                 ▼                 ▼
     ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
     │    Email     │  │   WhatsApp   │  │  In-Platform │
-    │ (SendGrid)   │  │   (Twilio)   │  │     Chat     │
+    │   (Brevo)    │  │   (Twilio)   │  │     Chat     │
     └──────────────┘  └──────────────┘  └──────────────┘
 ```
 
@@ -743,7 +743,7 @@ View dashboard: engarde.media/walker-agents
 
 3. **En Garde Integration**
    - Walker Agent API endpoint configured
-   - Notification service credentials (SendGrid, Twilio)
+   - Notification service credentials (Brevo, Twilio)
    - Webhook authentication tokens
 
 ### Setup Steps
@@ -961,7 +961,7 @@ Key metrics to monitor:
 
 **3. Notification Delivery Failures**
 - **Symptom**: Users not receiving campaign suggestions
-- **Solution**: Check En Garde API connectivity, verify SendGrid/Twilio credentials
+- **Solution**: Check En Garde API connectivity, verify Brevo/Twilio credentials
 
 **4. MinIO Storage Full**
 - **Symptom**: Data ingestion fails with storage errors
