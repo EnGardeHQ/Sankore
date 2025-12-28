@@ -11,6 +11,25 @@ httpx==0.28.1
 openai>=1.0.0
 alembic==1.13.1
 psycopg2-binary==2.9.9
+
+# Celery & Task Queue
+celery[redis]==5.3.4
+flower==2.0.1
+kombu==5.3.4
+
+# MinIO Object Storage
+minio==7.2.0
+
+# Apache Airflow (Optional - for DAG execution)
+# apache-airflow==2.8.0
+# apache-airflow-providers-celery==3.4.0
+
+# Ad Platform APIs
+google-ads==24.0.0
+facebook-business==19.0.0
+# linkedin-api  # Add when available
+# tiktok-business-api  # Add when available
+
 # For trend scraping (future use)
 beautifulsoup4>=4.12.0
 playwright>=1.40.0

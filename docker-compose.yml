@@ -21,10 +21,20 @@ services:
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - MINIO_ENDPOINT=sankore-minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-sankore-minio-key}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-sankore-minio-secret}
+      - ENGARDE_API_URL=${ENGARDE_API_URL:-https://api.engarde.com}
+      - ENGARDE_API_KEY=${ENGARDE_API_KEY}
+      - ENGARDE_TENANT_UUID=${ENGARDE_TENANT_UUID}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      sankore-minio:
         condition: service_healthy
     restart: unless-stopped
     networks:
@@ -47,7 +57,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5432"
     restart: unless-stopped
     networks:
       - sankore-network
@@ -57,12 +67,12 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis Cache (Optional)
+  # Redis Cache & Celery Broker
   redis:
     image: redis:7-alpine
     container_name: sankore-redis
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
     restart: unless-stopped
@@ -73,6 +83,108 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+
+  # MinIO Object Storage (Bucket Storage for Lakehouse)
+  sankore-minio:
+    image: minio/minio:latest
+    container_name: sankore-minio
+    ports:
+      - "9002:9000"   # MinIO API
+      - "9003:9001"   # MinIO Console
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY:-sankore-minio-key}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY:-sankore-minio-secret}
+    volumes:
+      - minio_data:/data
+    networks:
+      - sankore-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+
+  # Celery Worker (Async Task Processing)
+  sankore-celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: sankore-celery-worker
+    command: celery -A src.celery_app worker --loglevel=info --concurrency=4 -Q default,ads,trends,analysis
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://sankore:sankore_password@postgres:5432/sankore_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - MINIO_ENDPOINT=sankore-minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-sankore-minio-key}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-sankore-minio-secret}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - META_API_KEY=${META_API_KEY:-}
+      - TIKTOK_ACCESS_TOKEN=${TIKTOK_ACCESS_TOKEN:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      sankore-minio:
+        condition: service_healthy
+    networks:
+      - sankore-network
+    restart: unless-stopped
+
+  # Celery Beat (Scheduler)
+  sankore-celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: sankore-celery-beat
+    command: celery -A src.celery_app beat --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://sankore:sankore_password@postgres:5432/sankore_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sankore-network
+    restart: unless-stopped
+
+  # Flower (Celery Monitoring Dashboard)
+  sankore-flower:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: sankore-flower
+    command: celery -A src.celery_app flower --port=5555
+    ports:
+      - "5556:5555"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - FLOWER_BASIC_AUTH=${FLOWER_BASIC_AUTH:-admin:sankore-flower-password}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - sankore-network
+    restart: unless-stopped
 
 networks:
   sankore-network:
@@ -82,4 +194,6 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  minio_data:
     driver: local
