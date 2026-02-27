@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     META_API_KEY: str = ""
     TIKTOK_ACCESS_TOKEN: str = ""
 
+    # EnGarde Integration
+    ENGARDE_API_BASE_URL: str = "http://localhost:8000"
+    ENGARDE_SERVICE_API_KEY: str = ""
+
     # Logging
     LOG_LEVEL: str = "INFO"
 
